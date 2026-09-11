@@ -14,8 +14,22 @@ pip install "hyper2-client @ git+https://github.com/0x417/h2-client.git"
 python -c "import hyper2; print(hyper2.__version__)"
 ```
 
-Python 3.10+; verified on 3.12 against a 3.14 server. If installation is inconvenient, `src/hyper2/wire.py`
-is one file and can be vendored as-is.
+While this repository is private that URL needs a credential, so pick whichever of the three the
+installing machine already has:
+
+```bash
+# a GitHub account with an SSH key on it (nothing to paste)
+pip install "hyper2-client @ git+ssh://git@github.com/0x417/h2-client.git"
+
+# a personal access token with read access to this repository
+pip install "hyper2-client @ git+https://<token>@github.com/0x417/h2-client.git"
+
+# no GitHub access at all: from a downloaded copy
+pip install ./h2-client
+```
+
+Python 3.10+; verified on 3.12 against a 3.14 server. If installation is inconvenient,
+`src/hyper2/wire.py` is one file with no dependencies and can be vendored as-is.
 
 ## Connect
 
