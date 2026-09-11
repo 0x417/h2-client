@@ -14,17 +14,10 @@ pip install "hyper2-client @ git+https://github.com/0x417/h2-client.git"
 python -c "import hyper2; print(hyper2.__version__)"
 ```
 
-While this repository is private that URL needs a credential, so pick whichever of the three the
-installing machine already has:
+No credential is needed. If a machine has no outbound GitHub access, a downloaded copy installs
+the same way:
 
 ```bash
-# a GitHub account with an SSH key on it (nothing to paste)
-pip install "hyper2-client @ git+ssh://git@github.com/0x417/h2-client.git"
-
-# a personal access token with read access to this repository
-pip install "hyper2-client @ git+https://<token>@github.com/0x417/h2-client.git"
-
-# no GitHub access at all: from a downloaded copy
 pip install ./h2-client
 ```
 
