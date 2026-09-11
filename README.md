@@ -1,6 +1,6 @@
-# hyper2-client
+# stagtrace-tuner
 
-The client half of a hyper2 optimisation run. **Standard library only** — no optimiser, no numpy,
+The client half of a Stagtrace optimisation run. **Standard library only** — no optimiser, no numpy,
 no torch, nothing pinned, so it cannot collide with the versions a training stack fixes.
 
 Everything that decides anything — the search box, the budget, the ladder, the evaluation schedule,
@@ -10,8 +10,8 @@ registered against a problem id before a run starts. The client names the proble
 ## Install
 
 ```bash
-pip install "hyper2-client @ git+https://github.com/0x417/h2-client.git"
-python -c "import hyper2; print(hyper2.__version__)"
+pip install "stagtrace-tuner @ git+https://github.com/0x417/h2-client.git"
+python -c "from stagtrace import tuner; print(tuner.__version__)"
 ```
 
 No credential is needed. If a machine has no outbound GitHub access, a downloaded copy installs
@@ -22,23 +22,23 @@ pip install ./h2-client
 ```
 
 Python 3.10+; verified on 3.12 against a 3.14 server. If installation is inconvenient,
-`src/hyper2/wire.py` is one file with no dependencies and can be vendored as-is.
+`src/stagtrace/tuner/wire.py` is one file with no dependencies and can be vendored as-is.
 
 ## Connect
 
 Three values identify the endpoint and the run:
 
 ```bash
-export HYPER2_SERVER=http://<host>:8077   # the endpoint
-export HYPER2_API_KEY=<api key>           # issued with it; every request carries it
-export HYPER2_PROBLEM=<problem id>        # the problem registered for this run
-export HYPER2_SEED=0                     # which repetition
+export STAGTRACE_SERVER=http://<host>:8077   # the endpoint
+export STAGTRACE_API_KEY=<api key>           # issued with it; every request carries it
+export STAGTRACE_PROBLEM=<problem id>        # the problem registered for this run
+export STAGTRACE_SEED=0                     # which repetition
 
-python -m hyper2.wire --check             # reaches the endpoint, checks the key, lists the problems
+python -m stagtrace.tuner.wire --check             # reaches the endpoint, checks the key, lists the problems
 ```
 
 `connect(problem, server=..., api_key=...)` takes the first two directly and falls back to
-`$HYPER2_SERVER` / `$HYPER2_API_KEY` when they are omitted; the two spellings are equivalent. The
+`$STAGTRACE_SERVER` / `$STAGTRACE_API_KEY` when they are omitted; the two spellings are equivalent. The
 examples pass them explicitly so it stays visible where the credential is used, and read them with
 `os.environ[...]` rather than `.get(...)`, so a missing variable fails at once naming itself instead
 of becoming an obscure rejection several calls later. A 401 means the key was missing or wrong: it
@@ -50,13 +50,13 @@ This listing is the opening of `examples/driver.py`, quoted from the file itself
 restated, so it cannot drift from the code that is actually run:
 
 ```python
-import hyper2
+from stagtrace import tuner
 
 TOKENS_PER_RUN = 25_400_000          # cost of ONE complete training run, in the caller's own unit
 
 # The arguments below describe the task, its cost and its acceptance bar. None of them changes how
 # the search works; everything that does is registered server-side against the problem id.
-study = hyper2.connect(
+study = tuner.connect(
     PROBLEM,
     server=SERVER,
     api_key=API_KEY,
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
 ```python
 TOKENS_PER_RUN = 25_400_000
-study = hyper2.connect(PROBLEM, seed=0,
+study = tuner.connect(PROBLEM, seed=0,
                        tokens_per_run=TOKENS_PER_RUN,
                        budget=3 * TOKENS_PER_RUN,
                        target=0.47, eval_steps=(3, 4))
@@ -173,7 +173,7 @@ Some problem ids carry **no** budget and require `budget=` and `tokens_per_run=`
 registered already. `GET /v1/problems` reports which is which; requesting an open-budget problem without them is
 refused immediately, naming what is missing.
 
-`server` and `api_key` locate the endpoint, falling back to `$HYPER2_SERVER` / `$HYPER2_API_KEY`.
+`server` and `api_key` locate the endpoint, falling back to `$STAGTRACE_SERVER` / `$STAGTRACE_API_KEY`.
 Any other setting is **refused by name**. That is what keeps a delivered run identical to the
 configuration the published benchmark measured.
 
@@ -189,7 +189,7 @@ python examples/smoke_client.py           # opens a study and prints the recomme
 suggest every knob, train to each cumulative target, report, act on the instruction, persist. The
 four points that are easy to get wrong are marked in the file:
 
-1. `hyper2.connect("<problem id>")` replaces `create_study(...)` — every lever is registered
+1. `tuner.connect("<problem id>")` replaces `create_study(...)` — every lever is registered
    server-side, so `seed` and `target` are the only arguments left.
 2. `plan()` yields **three** values, `(ckpt, tokens_target, kind)`. Two raises on the first
    iteration.

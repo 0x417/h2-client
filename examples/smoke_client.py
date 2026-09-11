@@ -1,17 +1,16 @@
-# ⚠ GENERATED FILE -- DO NOT EDIT HERE.
-# Emitted from src/hyper2/wire.py in the hyper2 development repo by
-# scripts/build_client_repo.py. Edit the source, re-run the generator, and the
-# in-sync test will confirm the two are byte-identical.
+# GENERATED FILE -- DO NOT EDIT HERE.
+# Emitted by the Stagtrace build from the canonical client source. Edit the source,
+# re-run the generator, and the in-sync test will confirm the two still agree.
 #!/usr/bin/env python3
 """A 30-second end-to-end check, run from the client machine before any real work starts.
 
 It reaches the endpoint, lists what it will run, opens a study, serves its work orders with a
 stand-in "training" function, and prints the recommendation. No GPU, no data, no dependencies
-beyond hyper2 itself. If this passes, the transport, the key, the box, the metric wiring and the
+beyond the client itself. If this passes, the transport, the key, the box, the metric wiring and the
 budget accounting are all correct, and the only thing left to substitute is real training.
 
-    export HYPER2_SERVER=http://<host>:8077
-    export HYPER2_API_KEY=<api key>
+    export STAGTRACE_SERVER=http://<host>:8077
+    export STAGTRACE_API_KEY=<api key>
     python poc/the customer/smoke_client.py [--problem the customer-lora-b4] [--seed 0] [--target 2.30]
 """
 from __future__ import annotations
@@ -23,10 +22,10 @@ import os
 import sys
 import urllib.request
 
-# STDLIB ONLY. `hyper2.wire` is the whole client; it does not import the optimiser, so nothing here
+# STDLIB ONLY. `stagtrace.tuner.wire` is the whole client; it does not import the optimiser, so nothing here
 # can collide with the numpy a training stack pins. The box comes from the SERVER (`study.space`)
 # rather than from a local copy of it, which is the other thing a customer should not have to have.
-import hyper2                                               # noqa: E402
+from stagtrace import tuner
 
 
 def suggest_all(trial, space: dict) -> dict:
@@ -62,7 +61,7 @@ def fake_train(hp: dict, cumulative_tokens: float) -> tuple[float, float]:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--problem", default=os.environ.get("HYPER2_PROBLEM", "<problem-id>"))
+    ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM", "<problem-id>"))
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tokens-per-run", type=float, default=None,
                     help="cost of ONE complete training run, in the caller's own unit. Required "
@@ -73,11 +72,11 @@ def main(argv=None) -> int:
     ap.add_argument("--target", type=float, default=None)
     a = ap.parse_args(argv)
 
-    url = os.environ.get("HYPER2_SERVER")
+    url = os.environ.get("STAGTRACE_SERVER")
     if not url:
-        print("set HYPER2_SERVER (and HYPER2_API_KEY)", file=sys.stderr)
+        print("set STAGTRACE_SERVER (and STAGTRACE_API_KEY)", file=sys.stderr)
         return 2
-    key = os.environ.get("HYPER2_API_KEY")
+    key = os.environ.get("STAGTRACE_API_KEY")
 
     req = urllib.request.Request(url.rstrip("/") + "/v1/problems")
     if key:
@@ -91,7 +90,7 @@ def main(argv=None) -> int:
 
     extra = {k: v for k, v in (("budget", a.budget), ("tokens_per_run", a.tokens_per_run))
              if v is not None}
-    study = hyper2.connect(a.problem, seed=a.seed, target=a.target, server=url, api_key=key,
+    study = tuner.connect(a.problem, seed=a.seed, target=a.target, server=url, api_key=key,
                            **extra)
     print(f"\nopened {a.problem} (seed {a.seed}) -- {study.description}")
     print(f"budget: {study.budget_cost:,.0f} tokens over {len(study.space)} knobs\n")

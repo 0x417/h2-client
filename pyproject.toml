@@ -1,7 +1,7 @@
 [project]
-name = "hyper2-client"
+name = "stagtrace-tuner"
 version = "0.1.0"
-description = "Thin client for a hyper2 optimisation server. Standard library only."
+description = "Thin client for a Stagtrace optimisation server. Standard library only."
 requires-python = ">=3.10"
 dependencies = []
 
@@ -9,5 +9,10 @@ dependencies = []
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
+# NAMESPACE PACKAGE ON PURPOSE. `src/stagtrace/` carries no __init__.py, so a later
+# stagtrace-serve or stagtrace-live installs alongside this one under the same import root
+# instead of colliding with it.
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["stagtrace*"]
+namespaces = true

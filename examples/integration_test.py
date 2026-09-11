@@ -1,7 +1,6 @@
-# ⚠ GENERATED FILE -- DO NOT EDIT HERE.
-# Emitted from src/hyper2/wire.py in the hyper2 development repo by
-# scripts/build_client_repo.py. Edit the source, re-run the generator, and the
-# in-sync test will confirm the two are byte-identical.
+# GENERATED FILE -- DO NOT EDIT HERE.
+# Emitted by the Stagtrace build from the canonical client source. Edit the source,
+# re-run the generator, and the in-sync test will confirm the two still agree.
 #!/usr/bin/env python3
 """STAGE 1 OF THE INTEGRATION TEST: the whole chain on CPU, in seconds, no GPU.
 
@@ -23,8 +22,8 @@ and asserts each of them:
 Stage 2 is a smoke run on the real stack at a fraction of the true `tokens_per_run`, checking the
 ledger, resume, determinism and the exact token count against real training.
 
-    export HYPER2_SERVER=http://<host>:8077
-    export HYPER2_API_KEY=<key>
+    export STAGTRACE_SERVER=http://<host>:8077
+    export STAGTRACE_API_KEY=<key>
     python poc/the customer/integration_test.py [--problem the customer-lora-b8] [--target 0.47]
 """
 from __future__ import annotations
@@ -38,7 +37,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-import hyper2                                               # noqa: E402
+from stagtrace import tuner
 
 
 class MockTrainer:
@@ -104,7 +103,7 @@ def run_once(problem: str, seed: int, target, url: str, key, root: Path, budget=
              tokens_per_run=None):
     extra = {k: v for k, v in (("budget", budget), ("tokens_per_run", tokens_per_run))
              if v is not None}
-    study = hyper2.connect(problem, seed=seed, target=target, server=url, api_key=key, **extra)
+    study = tuner.connect(problem, seed=seed, target=target, server=url, api_key=key, **extra)
     tr = MockTrainer(root)
     drawn: list[tuple] = []
     actions: dict[str, int] = {}
@@ -135,7 +134,7 @@ def run_once(problem: str, seed: int, target, url: str, key, root: Path, budget=
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--problem", default=os.environ.get("HYPER2_PROBLEM", "<problem-id>"))
+    ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM", "<problem-id>"))
     ap.add_argument("--tokens-per-run", type=float, default=None,
                     help="cost of ONE complete training run, in the caller's own unit. Required "
                          "for a problem that registers no budget.")
@@ -146,11 +145,11 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
 
-    url = os.environ.get("HYPER2_SERVER")
+    url = os.environ.get("STAGTRACE_SERVER")
     if not url:
-        print("set HYPER2_SERVER (and HYPER2_API_KEY)", file=sys.stderr)
+        print("set STAGTRACE_SERVER (and STAGTRACE_API_KEY)", file=sys.stderr)
         return 2
-    key = os.environ.get("HYPER2_API_KEY")
+    key = os.environ.get("STAGTRACE_API_KEY")
     root = Path(tempfile.mkdtemp(prefix="h2-integration-"))
     checks: list[tuple[bool, str]] = []
     try:

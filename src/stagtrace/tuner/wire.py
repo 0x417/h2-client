@@ -1,21 +1,18 @@
-# ⚠ GENERATED FILE -- DO NOT EDIT HERE.
-# Emitted from src/hyper2/wire.py in the hyper2 development repo by
-# scripts/build_client_repo.py. Edit the source, re-run the generator, and the
-# in-sync test will confirm the two are byte-identical.
+# GENERATED FILE -- DO NOT EDIT HERE.
+# Emitted by the Stagtrace build from the canonical client source. Edit the source,
+# re-run the generator, and the in-sync test will confirm the two still agree.
 #!/usr/bin/env python3
 """The wire client: everything the calling machine needs, and nothing else.
 
-Why it is a top-level module: importing a submodule executes its package's `__init__`, and
-`hyper2.client.__init__` is the in-process engine, which pulls in numpy. A client whose only job is
-to train and report would then have to install an optimiser it never calls and reconcile that
-numpy against whatever the training stack pins. This module imports nothing beyond the standard
-library, so no such conflict is possible.
+Why it is one flat module: the optimisation engine it talks to pulls in numpy, and a client
+whose only job is to train and report would then have to install an optimiser it never calls and
+reconcile that numpy against whatever the training stack pins. This module imports nothing beyond
+the standard library, so no such conflict is possible.
 
-    import hyper2.wire as hyper2        # stdlib only
-    study = hyper2.connect("<problem-id>", seed=0)
+    from stagtrace import tuner         # stdlib only
+    study = tuner.connect("<problem-id>", seed=0)
 
-`hyper2.connect` routes here, and `hyper2.client.remote` re-exports from here. The file is small
-enough to vendor: one module and the standard library are the entire client.
+The file is small enough to vendor: one module and the standard library are the entire client.
 """
 from __future__ import annotations
 
@@ -33,7 +30,7 @@ class TrialPruned(Exception):
     ⚠ DEFINED HERE AND IMPORTED BY THE ENGINE, not defined in both. Two classes of the same name
     are not the same class: an objective raising the wire module's `TrialPruned` would sail
     straight through the engine's `except TrialPruned`, and a trial that should have paused would
-    fail the study instead. `hyper2.client` re-exports this one."""
+    fail the study instead. The engine re-exports this one."""
 
 
 class TrialState(Enum):
@@ -236,7 +233,7 @@ class _RemoteTrial:
         # traceback immediately rather than let them wait out a timeout and then hear about the
         # network.
         if r.get("error"):
-            raise RuntimeError(f"the hyper2 server rejected this reading and the study has "
+            raise RuntimeError(f"the optimisation server rejected this reading and the study has "
                                f"stopped:\n{r['error']}")
         self._aborted = bool(r.get("aborted"))
         if "spent" in r:
@@ -496,8 +493,8 @@ class RemoteStudy:
                     break
                 _time.sleep(self.BACKOFF * (2 ** attempt))
         raise RuntimeError(
-            f"cannot reach the hyper2 server at {self._base} after {self.RETRIES} attempts "
-            f"({last}). Start it with `python -m hyper2.server`, and "
+            f"cannot reach the optimisation server at {self._base} after {self.RETRIES} attempts "
+            f"({last}). Check the endpoint URL, the network route and the API key. "
             f"check the tailnet and the API key. If the server is still up, the study is alive on "
             f"it and these calls are idempotent, so retrying the same step resumes rather than "
             f"double-reporting.") from None
@@ -520,7 +517,7 @@ class RemoteStudy:
             detail = e.read().decode(errors="replace")[:300]
             if 500 <= e.code < 600:
                 raise _Transient(f"{e.code}: {detail}") from e     # the server may recover
-            raise RuntimeError(f"hyper2 server {e.code} on {method} {path}: {detail}") from None
+            raise RuntimeError(f"server {e.code} on {method} {path}: {detail}") from None
         except urllib.error.URLError as e:
             raise _Transient(f"unreachable: {e.reason}") from e
         except (TimeoutError, OSError) as e:                       # a dropped socket mid-study
@@ -533,16 +530,15 @@ class RemoteStudy:
     def optimize(self, objective) -> None:
         """Serve the server's work orders until the plan is done.
 
-        The LOOP THAT DECIDES ANYTHING is the server's -- it runs the real
-        `hyper2.client.Study.optimize`, with all of its backfill and non-termination guards, and
-        hands each work order here. This side only executes them, which is exactly the division a
+        The LOOP THAT DECIDES ANYTHING is the server's -- it runs the real optimisation
+        loop, with all of its backfill and non-termination guards, and hands each work order here. This side only executes them, which is exactly the division a
         customer's trainer has.
         """
         while True:
             wo = self._post("next")
             if wo.get("done"):
                 if wo.get("error"):
-                    raise RuntimeError(f"hyper2 server study failed:\n{wo['error']}")
+                    raise RuntimeError(f"server study failed:\n{wo['error']}")
                 # ⛔ A STUDY THAT NEVER SAW ITS TARGET METRIC DID NOT RUN, IT ONLY RETURNED.
                 # Reporting the wrong signal name -- `report(ce, step, ce=ce)` against a problem
                 # judged on `structural` -- leaves the plan with nothing to measure. It screens one
@@ -607,16 +603,16 @@ def connect(problem: str, *, seed: int | None = None, target: float | None = Non
             eval_at=None, eval_steps=None, budget: float | None = None,
             tokens_per_run: float | None = None,
             server: str | None = None, api_key: str | None = None, timeout: float = 900.0):
-    """Open a study against a hyper2 endpoint. See `hyper2.client.connect` for the full contract.
+    """Open a study against an optimisation endpoint.
 
     The caller's entire configuration surface. `seed` and `target` are accepted because neither
     changes what is searched; anything else is registered on the server and refused BY NAME here.
-    `server`/`api_key` fall back to `$HYPER2_SERVER` / `$HYPER2_API_KEY`.
+    `server`/`api_key` fall back to `$STAGTRACE_SERVER` / `$STAGTRACE_API_KEY`.
     """
-    url = server or os.environ.get("HYPER2_SERVER")
+    url = server or os.environ.get("STAGTRACE_SERVER")
     if not url:
         raise ValueError("connect() needs the endpoint: pass server='https://...' or set "
-                         "$HYPER2_SERVER. This is a connection detail, not a search setting.")
+                         "$STAGTRACE_SERVER. This is a connection detail, not a search setting.")
     extra = {k: v for k, v in (("seed", seed), ("target", target)) if v is not None}
     if tokens_per_run is not None:
         # COST OF ONE COMPLETE TRAINING RUN, IN THE CALLER'S UNIT. Stated by the caller, because only the calling stack can measure it. It sets the unit for everything: the budget, the checkpoint targets
@@ -642,12 +638,12 @@ def connect(problem: str, *, seed: int | None = None, target: float | None = Non
         # can afford. Sent as the engine's `target_rungs`: 1-based checkpoint indices into this
         # problem's ladder.
         extra["target_rungs"] = [int(x) for x in eval_steps]
-    return RemoteStudy(url, problem=problem, api_key=api_key or os.environ.get("HYPER2_API_KEY"),
+    return RemoteStudy(url, problem=problem, api_key=api_key or os.environ.get("STAGTRACE_API_KEY"),
                        timeout=float(timeout), **extra)
 
 
 # ------------------------------------------------------------------------------------------------
-# `python -m hyper2.wire --check` -- the first thing a customer should run, before any training.
+# `python -m stagtrace.tuner.wire --check` -- the first thing a customer should run, before any training.
 #
 # It answers the three questions that otherwise get answered by a failed GPU run: can I reach the
 # endpoint, is my key accepted, and which problems will it run. Kept in this module so the
@@ -656,14 +652,14 @@ def connect(problem: str, *, seed: int | None = None, target: float | None = Non
 def _main(argv=None) -> int:
     import argparse
 
-    ap = argparse.ArgumentParser(prog="python -m hyper2.wire",
-                                 description="check a hyper2 endpoint and list what it will run")
+    ap = argparse.ArgumentParser(prog="python -m stagtrace.tuner.wire",
+                                 description="check an optimisation endpoint and list what it will run")
     ap.add_argument("--check", action="store_true", help="reach the endpoint and list its problems")
-    ap.add_argument("--server", default=os.environ.get("HYPER2_SERVER"))
-    ap.add_argument("--api-key", default=os.environ.get("HYPER2_API_KEY"))
+    ap.add_argument("--server", default=os.environ.get("STAGTRACE_SERVER"))
+    ap.add_argument("--api-key", default=os.environ.get("STAGTRACE_API_KEY"))
     a = ap.parse_args(argv)
     if not a.server:
-        print("set HYPER2_SERVER (and HYPER2_API_KEY), or pass --server", file=sys.stderr)
+        print("set STAGTRACE_SERVER (and STAGTRACE_API_KEY), or pass --server", file=sys.stderr)
         return 2
     base = a.server.rstrip("/")
     for path, need_key in (("/v1/health", False), ("/v1/problems", True)):

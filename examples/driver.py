@@ -1,9 +1,8 @@
-# ⚠ GENERATED FILE -- DO NOT EDIT HERE.
-# Emitted from src/hyper2/wire.py in the hyper2 development repo by
-# scripts/build_client_repo.py. Edit the source, re-run the generator, and the
-# in-sync test will confirm the two are byte-identical.
+# GENERATED FILE -- DO NOT EDIT HERE.
+# Emitted by the Stagtrace build from the canonical client source. Edit the source,
+# re-run the generator, and the in-sync test will confirm the two still agree.
 #!/usr/bin/env python3
-"""Minimal driver: one optimisation run against a hyper2 server.
+"""Minimal driver: one optimisation run against a server.
 
 The client names a registered problem and then does two things — train, and report. The search box,
 the checkpoint ladder, the screening shape and the transfer prior live on the server, registered
@@ -41,27 +40,27 @@ The four helpers at the bottom are stubs, so this file runs on a CPU in seconds 
 whole chain — transport, key, box, metric wiring, resume, budget accounting — before any accelerator
 is involved. Replace them with real training and real evaluation.
 
-    export HYPER2_SERVER=http://<host>:8077      # the endpoint
-    export HYPER2_API_KEY=<api key>              # issued with it; every request carries it
-    export HYPER2_PROBLEM=<problem id>           # the problem registered for this run
-    export HYPER2_SEED=0                         # which repetition
+    export STAGTRACE_SERVER=http://<host>:8077      # the endpoint
+    export STAGTRACE_API_KEY=<api key>              # issued with it; every request carries it
+    export STAGTRACE_PROBLEM=<problem id>           # the problem registered for this run
+    export STAGTRACE_SEED=0                         # which repetition
     python examples/driver.py
 """
 import os
 
-import hyper2
+from stagtrace import tuner
 
 # ---- where to connect, and as whom ---------------------------------------------------------
 # Three values identify the endpoint and the run. They are read from the environment here so that
 # no address or credential is written into the file; assigning them literally works just as well.
 # `os.environ[...]` rather than `.get(...)`: a missing variable then fails immediately, naming
 # itself, instead of turning into an obscure rejection several calls later.
-SERVER  = os.environ["HYPER2_SERVER"]      # e.g. "http://10.1.2.3:8077"
-API_KEY = os.environ["HYPER2_API_KEY"]     # issued with the endpoint; required by it
-PROBLEM = os.environ["HYPER2_PROBLEM"]     # the problem id registered for this engagement
-SEED    = int(os.environ["HYPER2_SEED"])   # which repetition this is: 0, 1, 2, ...
+SERVER  = os.environ["STAGTRACE_SERVER"]      # e.g. "http://10.1.2.3:8077"
+API_KEY = os.environ["STAGTRACE_API_KEY"]     # issued with the endpoint; required by it
+PROBLEM = os.environ["STAGTRACE_PROBLEM"]     # the problem id registered for this engagement
+SEED    = int(os.environ["STAGTRACE_SEED"])   # which repetition this is: 0, 1, 2, ...
 
-# `connect` also falls back to $HYPER2_SERVER and $HYPER2_API_KEY when `server`/`api_key` are
+# `connect` also falls back to $STAGTRACE_SERVER and $STAGTRACE_API_KEY when `server`/`api_key` are
 # omitted, so both spellings are equivalent. They are passed explicitly below to keep it visible
 # where the credential is used.
 
@@ -70,7 +69,7 @@ TOKENS_PER_RUN = 25_400_000          # cost of ONE complete training run, in the
 
 # The arguments below describe the task, its cost and its acceptance bar. None of them changes how
 # the search works; everything that does is registered server-side against the problem id.
-study = hyper2.connect(
+study = tuner.connect(
     PROBLEM,
     server=SERVER,
     api_key=API_KEY,
