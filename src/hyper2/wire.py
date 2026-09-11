@@ -308,8 +308,13 @@ class RemoteStudy:
         """
         return {k: tuple(v) for k, v in self._space.items()}
 
-    #: The signal name this study judges on. Report it on EVERY checkpoint:
-    #:     trial.report(ce, step=ckpt, **{study.target_key: my_score})
+    #: The signal name this study judges on. Report it under this name at the checkpoints
+    #: `needs_judged_metric` identifies -- NOT at every one:
+    #:     if study.needs_judged_metric(ckpt):
+    #:         signals[study.target_key] = expensive_eval(model)
+    #: (This once said to report it at every one, which was true while `eval_at` was fixed
+    #: server-side. Once the caller could choose the schedule that stopped being true, and
+    #: following it multiplies the single most expensive thing a driver does.)
     #: Read from the server rather than agreed in prose, because a driver reporting the wrong name
     #: leaves the plan with nothing to measure -- it screens one cohort, stops, and still returns a
     #: recommendation. The client raises on that, but a driver that reads the name never gets there.
@@ -360,7 +365,7 @@ class RemoteStudy:
     def eval_at(self) -> tuple:
         """The evaluation schedule as FRACTIONS of one complete run -- `(0.5, 1.0)` is halfway and
         at the end. The same thing `eval_steps` gives as checkpoint indices, in the unit a person
-        reasons in. Multiply by `tokens_per_run` for absolute counts."""
+        reasons in. Fractions are the only form accepted: see `connect`."""
         return tuple(self._eval_at) if self._eval_at else ()
 
     @property
@@ -620,13 +625,15 @@ def connect(problem: str, *, seed: int | None = None, target: float | None = Non
         extra["full_run"] = float(tokens_per_run)
     if budget is not None:
         # TOTAL TOKENS FOR THE WHOLE SEARCH, screening AND training the recommendation out to full
-        # depth. Total-inclusive on purpose: it is the number the caller actually pay.
+        # depth. Total-inclusive on purpose: it is the number the caller actually pays.
         extra["total_budget"] = float(budget)
     if eval_at is not None:
-        # WHERE THE JUDGED METRIC IS PRODUCED, in units the caller already has: fractions of one
-        # complete run (`(0.5, 1.0)` -- halfway and at the end) or absolute token counts
-        # (`(12_700_000, 25_400_000)`). The server resolves them against this problem's checkpoints
-        # and refuses a value that is not one of them rather than snapping it quietly.
+        # WHERE THE JUDGED METRIC IS PRODUCED, as FRACTIONS of one complete run: `(0.5, 1.0)` is
+        # halfway and at the end. Fractions only -- a token count is refused by name, because the
+        # same count is a different depth for every caller and would move silently whenever
+        # tokens_per_run was re-measured. A depth that is not already a checkpoint is ADDED as one
+        # (a judged reading can only be taken where training pauses) and `study.description` says
+        # so; nothing is ever moved to a nearby depth quietly.
         extra["eval_at"] = ([float(eval_at)] if isinstance(eval_at, (int, float))
                             else [float(x) for x in eval_at])
     if eval_steps is not None:

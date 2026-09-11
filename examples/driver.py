@@ -79,7 +79,7 @@ study = hyper2.connect(
     budget=3 * TOKENS_PER_RUN,       # total for the whole search: screening AND the final train-out
     target=0.47,                     # acceptance threshold on the judged metric
     eval_at=(0.5, 1.0),              # where the judged metric is produced: halfway, and at the end.
-                                     #   Fractions of one run, or absolute token counts. A depth
+                                     #   FRACTIONS of one complete run, and only fractions. A depth
                                      #   that is not already a checkpoint is ADDED as one, and
                                      #   study.description says so. Omitted, the registered
                                      #   schedule applies. study.ladder lists every checkpoint.
@@ -146,7 +146,9 @@ RUNS = Path(os.environ.get("RUNS_DIR", "runs"))
 
 
 def new_model(cfg):
-    return {"cfg": cfg, "tokens": 0.0}
+    # The study is stamped in so `load_state` can tell this study's checkpoints from an earlier
+    # study's. See the note there.
+    return {"cfg": cfg, "tokens": 0.0, "study": study.study_id}
 
 
 def state_dir(run_id, number):
@@ -157,8 +159,21 @@ def state_dir(run_id, number):
 
 
 def load_state(run_id, number):
+    """State from THIS study, or None.
+
+    `run_id` is "<problem>:<seed>", which is stable across runs -- so a second run of one problem
+    and seed lands in the same directories as the first. A new study draws DIFFERENT configurations
+    for the same trial numbers, so resuming an earlier study's checkpoint here would train, and
+    report readings for, a configuration the server never drew. It is caught by stamping the study
+    into the state and ignoring anything written by another one: a stale directory then costs a
+    retrain, never a wrong answer. (Found by running this file twice against one server; the stub
+    trainer's cumulative-target assertion is what refused it.)
+    """
     p = state_dir(run_id, number) / "state.json"
-    return json.loads(p.read_text()) if p.is_file() else None
+    if not p.is_file():
+        return None
+    saved = json.loads(p.read_text())
+    return saved if saved.get("study") == study.study_id else None
 
 
 def save_state(model, run_id, number):
