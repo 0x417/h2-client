@@ -61,7 +61,12 @@ def fake_train(hp: dict, cumulative_tokens: float) -> tuple[float, float]:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM", "<problem-id>"))
+    # ⛔ NO PLACEHOLDER DEFAULT. This read `"<problem-id>"`, so running this script with no
+    # arguments -- the way the deployment notes document it -- failed with a 400 from the server.
+    # Unset now means "use the first problem the endpoint offers", which is what a 30-second
+    # end-to-end check should do.
+    ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM"),
+                    help="registered problem id; defaults to the first the endpoint offers")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tokens-per-run", type=float, default=None,
                     help="cost of ONE complete training run, in the caller's own unit. Required "
@@ -87,6 +92,10 @@ def main(argv=None) -> int:
     for p in listing["problems"]:
         # The endpoint already folds `seed` into `client_may_set`; appending it here printed it twice.
         print(f"  {p['id']:24s} settable: {p['client_may_set']}")
+
+    if not a.problem:
+        a.problem = listing["problems"][0]["id"]
+        print(f"\n(no --problem given; using the first one offered: {a.problem})")
 
     extra = {k: v for k, v in (("budget", a.budget), ("tokens_per_run", a.tokens_per_run))
              if v is not None}
