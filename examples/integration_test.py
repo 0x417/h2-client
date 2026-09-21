@@ -102,12 +102,12 @@ def suggest_all(trial, space: dict) -> dict:
 
 
 def run_once(problem: str, seed: int, target, url: str, key, root: Path, budget=None,
-             direction: str = "maximize",
+             direction: str = "maximize", metric: str = "structural",
              tokens_per_run=None):
     extra = {k: v for k, v in (("budget", budget), ("tokens_per_run", tokens_per_run))
              if v is not None}
     # the pair is required: see `--direction`
-    study = tuner.connect(problem, seed=seed, target=target, target_direction=direction,
+    study = tuner.connect(problem, seed=seed, target_key=metric, target=target, target_direction=direction,
                            server=url, api_key=key, **extra)
     tr = MockTrainer(root)
     drawn: list[tuple] = []
@@ -148,6 +148,8 @@ def main(argv=None) -> int:
                     help="total for the whole search, same unit. Required for a problem that "
                          "registers no budget.")
     ap.add_argument("--target", type=float, default=0.47)
+    ap.add_argument("--metric", default="structural",
+                    help="the name the judged metric is reported under; required with --target")
     ap.add_argument("--direction", default="maximize", choices=("maximize", "minimize"),
                     help="is a HIGHER value of the judged metric better, or a LOWER one? "
                          "Required by the server whenever --target is given")
@@ -179,7 +181,8 @@ def main(argv=None) -> int:
     root = Path(tempfile.mkdtemp(prefix="h2-integration-"))
     checks: list[tuple[bool, str]] = []
     try:
-        cost = dict(budget=a.budget, tokens_per_run=a.tokens_per_run, direction=a.direction)
+        cost = dict(budget=a.budget, tokens_per_run=a.tokens_per_run, direction=a.direction,
+                    metric=a.metric)
         study, tr, drawn, actions = run_once(a.problem, a.seed, a.target, url, key, root / "a", **cost)
         rec = study.recommendation
 

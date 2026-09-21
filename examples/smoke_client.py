@@ -67,6 +67,8 @@ def main(argv=None) -> int:
     # end-to-end check should do.
     ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM"),
                     help="registered problem id; defaults to the first the endpoint offers")
+    ap.add_argument("--metric", default="structural",
+                    help="the name the judged metric is reported under; required with --target")
     ap.add_argument("--direction", default="maximize", choices=("maximize", "minimize"),
                     help="is a HIGHER value of the judged metric better (maximize) or a LOWER one "
                          "(minimize)? Required by the server whenever --target is given")
@@ -105,7 +107,7 @@ def main(argv=None) -> int:
     # `target_direction` travels with `target` because the server requires the pair: a threshold on
     # its own does not say which side of it is good, and a default deciding that silently is the
     # defect this endpoint shipped until 2026-09-21.
-    study = tuner.connect(a.problem, seed=a.seed, target=a.target, target_direction=a.direction,
+    study = tuner.connect(a.problem, seed=a.seed, target_key=a.metric, target=a.target, target_direction=a.direction,
                            server=url, api_key=key, **extra)
     print(f"\nopened {a.problem} (seed {a.seed}) -- {study.description}")
     print(f"budget: {study.budget_cost:,.0f} tokens over {len(study.space)} knobs\n")

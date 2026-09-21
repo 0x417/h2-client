@@ -76,7 +76,9 @@ study = tuner.connect(
     seed=SEED,                       # one seed per repetition; a repetition is then reproducible
     tokens_per_run=TOKENS_PER_RUN,   # the unit every other quantity is expressed in
     budget=3 * TOKENS_PER_RUN,       # total for the whole search: screening AND the final train-out
-    target=0.47,                     # acceptance threshold on the judged metric
+    target_key="structural",         # WHICH metric the threshold applies to -- the name it is
+                                     #   reported under in trial.report(...). Required with target.
+    target=0.47,                     # acceptance threshold on that metric
     target_direction="maximize",     # REQUIRED alongside target, and deliberately not defaulted:
                                      #   a threshold alone does not say which side of it is good.
                                      #   "maximize" = a HIGHER value of the judged metric is better;
