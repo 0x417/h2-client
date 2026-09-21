@@ -24,7 +24,9 @@ ledger, resume, determinism and the exact token count against real training.
 
     export STAGTRACE_SERVER=http://<host>:8077
     export STAGTRACE_API_KEY=<key>
-    python poc/the customer/integration_test.py [--problem the customer-lora-b8] [--target 0.47]
+    python examples/integration_test.py [--problem <problem id>] [--target 0.47]
+
+    # --problem is optional: with none given it uses the first problem the endpoint offers.
 """
 from __future__ import annotations
 
@@ -100,10 +102,13 @@ def suggest_all(trial, space: dict) -> dict:
 
 
 def run_once(problem: str, seed: int, target, url: str, key, root: Path, budget=None,
+             direction: str = "maximize",
              tokens_per_run=None):
     extra = {k: v for k, v in (("budget", budget), ("tokens_per_run", tokens_per_run))
              if v is not None}
-    study = tuner.connect(problem, seed=seed, target=target, server=url, api_key=key, **extra)
+    # the pair is required: see `--direction`
+    study = tuner.connect(problem, seed=seed, target=target, target_direction=direction,
+                           server=url, api_key=key, **extra)
     tr = MockTrainer(root)
     drawn: list[tuple] = []
     actions: dict[str, int] = {}
@@ -134,7 +139,8 @@ def run_once(problem: str, seed: int, target, url: str, key, root: Path, budget=
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM", "<problem-id>"))
+    ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM"),
+                    help="registered problem id; defaults to the first the endpoint offers")
     ap.add_argument("--tokens-per-run", type=float, default=None,
                     help="cost of ONE complete training run, in the caller's own unit. Required "
                          "for a problem that registers no budget.")
@@ -142,6 +148,9 @@ def main(argv=None) -> int:
                     help="total for the whole search, same unit. Required for a problem that "
                          "registers no budget.")
     ap.add_argument("--target", type=float, default=0.47)
+    ap.add_argument("--direction", default="maximize", choices=("maximize", "minimize"),
+                    help="is a HIGHER value of the judged metric better, or a LOWER one? "
+                         "Required by the server whenever --target is given")
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args(argv)
 
@@ -150,10 +159,27 @@ def main(argv=None) -> int:
         print("set STAGTRACE_SERVER (and STAGTRACE_API_KEY)", file=sys.stderr)
         return 2
     key = os.environ.get("STAGTRACE_API_KEY")
+    if not a.problem:
+        # ⛔ THE DOCUMENTED COMMAND MUST RUN. This defaulted to the literal string "<problem-id>",
+        # so the invocation in the docstring above returned `400 unknown problem id '<problem-id>'`
+        # -- the customer's very first command, failing on a placeholder. The same defect was found
+        # and fixed in `smoke_client.py` on 2026-09-12 and this file was missed, which is why the
+        # fix now matches it exactly: ask the endpoint what it serves and take the first.
+        import json as _json
+        import urllib.request as _u
+        req = _u.Request(url.rstrip("/") + "/v1/problems",
+                         headers={"X-API-Key": key} if key else {})
+        with _u.urlopen(req, timeout=30) as r:
+            offered = _json.loads(r.read())["problems"]
+        if not offered:
+            print("the endpoint offers no problems", file=sys.stderr)
+            return 2
+        a.problem = offered[0]["id"]
+        print(f"(no --problem given; using the first the endpoint offers: {a.problem})")
     root = Path(tempfile.mkdtemp(prefix="h2-integration-"))
     checks: list[tuple[bool, str]] = []
     try:
-        cost = dict(budget=a.budget, tokens_per_run=a.tokens_per_run)
+        cost = dict(budget=a.budget, tokens_per_run=a.tokens_per_run, direction=a.direction)
         study, tr, drawn, actions = run_once(a.problem, a.seed, a.target, url, key, root / "a", **cost)
         rec = study.recommendation
 

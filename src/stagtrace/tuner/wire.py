@@ -436,6 +436,12 @@ class RemoteStudy:
         # would share a checkpoint directory and overwrite each other.
         self.seed = r.get("seed")
         self.target_key = str(r.get("target_key") or "structural")
+        #: The metrics this problem is known to work with -- a HINT, not a restriction. Pass
+        #: `target_key=` to `connect` to choose which one decides the search; ANY name is accepted,
+        #: including one absent from this list, so a caller may optimise a score of their own.
+        #: Every reported metric is recorded against each checkpoint and kept in the run's log
+        #: whatever it is called; only `target_key` is optimised on.
+        self.metrics = list(r.get("metrics") or ())
         self._eval_steps = r.get("eval_steps")
         self._eval_at = r.get("eval_at")
         self._ladder = r.get("ladder")
@@ -601,12 +607,14 @@ class RemoteStudy:
 
 def connect(problem: str, *, seed: int | None = None, target: float | None = None,
             eval_at=None, eval_steps=None, budget: float | None = None,
-            tokens_per_run: float | None = None,
+            tokens_per_run: float | None = None, target_key: str | None = None,
+            target_direction: str | None = None,
             server: str | None = None, api_key: str | None = None, timeout: float = 900.0):
     """Open a study against an optimisation endpoint.
 
-    The caller's entire configuration surface. `seed` and `target` are accepted because neither
-    changes what is searched; anything else is registered on the server and refused BY NAME here.
+    The caller's entire configuration surface. `seed`, `target` and `target_key` are accepted
+    because none of them changes what is SEARCHED -- `target_key` only selects which of the
+    reported metrics is the objective; anything else is registered server-side and refused BY NAME.
     `server`/`api_key` fall back to `$STAGTRACE_SERVER` / `$STAGTRACE_API_KEY`.
     """
     url = server or os.environ.get("STAGTRACE_SERVER")
@@ -614,6 +622,27 @@ def connect(problem: str, *, seed: int | None = None, target: float | None = Non
         raise ValueError("connect() needs the endpoint: pass server='https://...' or set "
                          "$STAGTRACE_SERVER. This is a connection detail, not a search setting.")
     extra = {k: v for k, v in (("seed", seed), ("target", target)) if v is not None}
+    if target_key is not None:
+        # WHICH REPORTED METRIC DECIDES THE SEARCH. A driver may report as many as it likes --
+        # `report(value, step, **signals)` takes any names, each is stored per checkpoint and
+        # written to the run's log -- but exactly ONE is optimised on, and this names it. `target`
+        # is the threshold on THAT metric, so the two normally move together.
+        #
+        # ANY name is accepted, including one the problem does not list: which score to optimise is
+        # the caller's decision, and `study.metrics` is a hint, not a gate. The cost of that
+        # freedom is that a name nothing reports cannot be caught at connect time; such a study
+        # stops after one cohort with "never received its target metric" rather than spending the
+        # budget, which is where a driver fault should surface.
+        extra["target_key"] = str(target_key)
+    if target_direction is not None:
+        # "minimize" (a loss) or "maximize" (a score), ON THE TARGET METRIC. The shipped problems
+        # declare minimize because the structural score is lower-is-better; a caller optimising an
+        # accuracy-like quantity passes "maximize". It changes one comparison -- the engine
+        # normalises both onto a single maximise axis -- and nothing about what is searched.
+        if str(target_direction) not in ("minimize", "maximize"):
+            raise ValueError(f"target_direction must be 'minimize' or 'maximize', got "
+                             f"{target_direction!r}")
+        extra["target_direction"] = str(target_direction)
     if tokens_per_run is not None:
         # COST OF ONE COMPLETE TRAINING RUN, IN THE CALLER'S UNIT. Stated by the caller, because only the calling stack can measure it. It sets the unit for everything: the budget, the checkpoint targets
         # `plan()` yields, and the train-out the plan reserves for the winner.

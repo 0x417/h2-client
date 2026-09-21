@@ -11,7 +11,7 @@ budget accounting are all correct, and the only thing left to substitute is real
 
     export STAGTRACE_SERVER=http://<host>:8077
     export STAGTRACE_API_KEY=<api key>
-    python poc/the customer/smoke_client.py [--problem the customer-lora-b4] [--seed 0] [--target 2.30]
+    python examples/smoke_client.py [--problem <problem id>] [--seed 0] [--target 2.30]
 """
 from __future__ import annotations
 
@@ -67,6 +67,9 @@ def main(argv=None) -> int:
     # end-to-end check should do.
     ap.add_argument("--problem", default=os.environ.get("STAGTRACE_PROBLEM"),
                     help="registered problem id; defaults to the first the endpoint offers")
+    ap.add_argument("--direction", default="maximize", choices=("maximize", "minimize"),
+                    help="is a HIGHER value of the judged metric better (maximize) or a LOWER one "
+                         "(minimize)? Required by the server whenever --target is given")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tokens-per-run", type=float, default=None,
                     help="cost of ONE complete training run, in the caller's own unit. Required "
@@ -99,8 +102,11 @@ def main(argv=None) -> int:
 
     extra = {k: v for k, v in (("budget", a.budget), ("tokens_per_run", a.tokens_per_run))
              if v is not None}
-    study = tuner.connect(a.problem, seed=a.seed, target=a.target, server=url, api_key=key,
-                           **extra)
+    # `target_direction` travels with `target` because the server requires the pair: a threshold on
+    # its own does not say which side of it is good, and a default deciding that silently is the
+    # defect this endpoint shipped until 2026-09-21.
+    study = tuner.connect(a.problem, seed=a.seed, target=a.target, target_direction=a.direction,
+                           server=url, api_key=key, **extra)
     print(f"\nopened {a.problem} (seed {a.seed}) -- {study.description}")
     print(f"budget: {study.budget_cost:,.0f} tokens over {len(study.space)} knobs\n")
 

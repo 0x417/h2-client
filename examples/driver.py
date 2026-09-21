@@ -77,6 +77,12 @@ study = tuner.connect(
     tokens_per_run=TOKENS_PER_RUN,   # the unit every other quantity is expressed in
     budget=3 * TOKENS_PER_RUN,       # total for the whole search: screening AND the final train-out
     target=0.47,                     # acceptance threshold on the judged metric
+    target_direction="maximize",     # REQUIRED alongside target, and deliberately not defaulted:
+                                     #   a threshold alone does not say which side of it is good.
+                                     #   "maximize" = a HIGHER value of the judged metric is better;
+                                     #   "minimize" = a LOWER one is (a loss). Deriving this from a
+                                     #   server-side default is how a run silently qualifies its
+                                     #   WORST configuration while every number still looks sane.
     eval_at=(0.5, 1.0),              # where the judged metric is produced: halfway, and at the end.
                                      #   FRACTIONS of one complete run, and only fractions. A depth
                                      #   that is not already a checkpoint is ADDED as one, and
