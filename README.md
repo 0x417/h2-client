@@ -95,8 +95,9 @@ def objective(trial):
         "lora_r":           trial.suggest_int("lora_r", 8, 128, log=True),
         "lora_alpha_ratio": trial.suggest_float("lora_alpha_ratio", 0.5, 4.0),
         "use_rslora":       trial.suggest_int("use_rslora", 0, 1),
-        "lora_plus_ratio":  trial.suggest_float("lora_plus_ratio", 1.0, 32.0, log=True),
-        "epochs":           trial.suggest_int("epochs", 1, 4),
+        # `lora_plus_ratio` and `epochs` were struck from the registered box on 2026-09-21: a
+        # trainer that cannot act on a knob should not be asked to search it. Suggesting a knob the
+        # server does not declare is refused by name, so they are gone from here too.
     }
 
     model = load_state(study.run_id, trial.number) or new_model(cfg)  # resume a prior session
